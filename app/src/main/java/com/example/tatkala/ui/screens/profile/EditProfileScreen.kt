@@ -1,4 +1,4 @@
-package ...ui.screens.settings.profile
+package com.example.tatkala.ui.screens.settings.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

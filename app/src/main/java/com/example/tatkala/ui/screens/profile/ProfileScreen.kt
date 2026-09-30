@@ -28,9 +28,12 @@ fun ProfileScreen(
     onBack: () -> Unit = {},
     onEditProfile: () -> Unit = {}
 ) {
+    // Data sementara / mock
     val userName = "Sutan"
-    val userEmail = "sutan@example.com"
     val username = "@sutan"
+    val userEmail = "sutan@example.com"
+    val phoneNumber = "081234567890"
+    val status = "Aktif"
 
     Column(
         modifier = Modifier
@@ -67,7 +70,7 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Avatar
             Box(
@@ -85,8 +88,9 @@ fun ProfileScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
+            // Nama
             Text(
                 text = userName,
                 fontSize = 24.sp,
@@ -96,21 +100,16 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // Username
             Text(
                 text = username,
                 fontSize = 14.sp,
                 color = Color.Gray
             )
 
-            Text(
-                text = userEmail,
-                fontSize = 14.sp,
-                color = Color.Gray
-            )
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Short information
+            // Informasi user
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
@@ -119,54 +118,41 @@ fun ProfileScreen(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
                 ) {
-                    Text(
-                        text = "About Me",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkPurple
+
+                    ProfileInfoItem(
+                        title = "Email",
+                        value = userEmail
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.LightGray
+                    )
 
-                    Text(
-                        text = "Managing tasks, building habits, and making every day count.",
-                        fontSize = 14.sp,
-                        color = Color.Gray
+                    ProfileInfoItem(
+                        title = "No. Telepon",
+                        value = phoneNumber
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        color = Color.LightGray
+                    )
+
+                    ProfileInfoItem(
+                        title = "Status",
+                        value = status
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Statistics
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                ProfileStat(
-                    modifier = Modifier.weight(1f),
-                    value = "24",
-                    label = "Tasks\nCompleted"
-                )
-
-                ProfileStat(
-                    modifier = Modifier.weight(1f),
-                    value = "7",
-                    label = "Current\nStreak"
-                )
-
-                ProfileStat(
-                    modifier = Modifier.weight(1f),
-                    value = "5",
-                    label = "Active\nHabits"
-                )
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Edit Profile
+            // Tombol Edit Profile
             Button(
                 onClick = onEditProfile,
                 modifier = Modifier
@@ -194,38 +180,26 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileStat(
-    modifier: Modifier = Modifier,
-    value: String,
-    label: String
+private fun ProfileInfoItem(
+    title: String,
+    value: String
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = value,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkPurple
-            )
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            color = Color.Gray
+        )
 
-            Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-        }
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = DarkPurple
+        )
     }
 }

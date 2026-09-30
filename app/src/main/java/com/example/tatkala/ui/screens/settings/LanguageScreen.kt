@@ -88,6 +88,16 @@ fun LanguageScreen(
                 selectedLanguage = "English"
             }
         )
+
+        Spacer(modifier = Modifier.padding(6.dp))
+
+        LanguageOption(
+            title = "Spanish",
+            selected = selectedLanguage == "Spanish",
+            onClick = {
+                selectedLanguage = "Spanish"
+            }
+        )
     }
 }
 

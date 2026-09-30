@@ -1,4 +1,4 @@
-package com.example.tatakala.ui.screens.settings.components
+package com.example.tatkala.ui.screens.settings.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

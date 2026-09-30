@@ -1,4 +1,4 @@
-package com.example.tatakala.ui.screens.settings
+package com.example.tatkala.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.example.tatakala.ui.screens.settings.components.SettingsRow
+import com.example.tatkala.ui.screens.settings.components.SettingsRow
 
 private val TatakalaPurple = Color(0xFF6D49AE)
 private val TatakalaBackground = Color(0xFFF8F8F8)

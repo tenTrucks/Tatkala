@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Link
@@ -44,6 +47,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,11 +56,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.tatkala.data.local.entity.HabitEntity
 import com.example.tatkala.data.local.entity.TaskEntity
+import com.example.tatkala.data.repository.HabitRepository
 import com.example.tatkala.data.repository.TaskRepository
 import com.example.tatkala.data.repository.UserRepository
 import kotlinx.coroutines.launch
@@ -67,22 +76,32 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private enum class CalendarMode { TODAY, WEEK, MONTH }
 
 @Composable
 fun HomeScreen(
     onAddClick: () -> Unit,
-    onEditTask: (Long) -> Unit
+    onEditTask: (Long) -> Unit,
+    onEditHabit: (Long) -> Unit
 ) {
     val tasks by TaskRepository.allTasksState().collectAsState()
+    val habits by HabitRepository.observeHabits().collectAsState(initial = emptyList())
+    val habitLogs by HabitRepository.observeCompletedLogs().collectAsState(initial = emptyList())
     val profile by UserRepository.profile.collectAsState()
+    val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf(CalendarMode.TODAY) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTask by remember { mutableStateOf<TaskEntity?>(null) }
     val tasksForSelectedDate = tasks
         .filter { it.date == selectedDate.toString() }
         .sortedWith(compareBy<TaskEntity> { it.startTime }.thenBy { it.createdAt })
+    val selectedDateText = selectedDate.toString()
+    val completedHabitIds = habitLogs
+        .filter { it.date == selectedDateText && it.completed }
+        .map { it.habitId }
+        .toSet()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -138,6 +157,9 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
+            item {
+                SectionHeader("Tasks", "${tasksForSelectedDate.count { it.isCompleted }}/${tasksForSelectedDate.size} complete")
+            }
             if (tasksForSelectedDate.isEmpty()) {
                 item {
                     EmptyState(
@@ -147,10 +169,54 @@ fun HomeScreen(
                 }
             } else {
                 items(tasksForSelectedDate, key = { it.id }) { task ->
-                    TaskCard(
-                        task = task,
-                        onClick = { selectedTask = task }
+                    SwipeCompleteBox(
+                        enabled = !task.isCompleted,
+                        onComplete = {
+                            scope.launch { TaskRepository.setCompleted(task.id, true) }
+                        }
+                    ) {
+                        TaskCard(
+                            task = task,
+                            onClick = { selectedTask = task }
+                        )
+                    }
+                }
+            }
+            item {
+                SectionHeader(
+                    title = "Habits",
+                    meta = "${completedHabitIds.size}/${habits.size} done"
+                )
+            }
+            if (habits.isEmpty()) {
+                item {
+                    EmptyState(
+                        title = "No habit yet",
+                        message = "Add a habit once, then mark it from Home every day."
                     )
+                }
+            } else {
+                items(habits, key = { it.id }) { habit ->
+                    val completed = habit.id in completedHabitIds
+                    SwipeCompleteBox(
+                        enabled = !completed,
+                        onComplete = {
+                            scope.launch {
+                                HabitRepository.setHabitCompleted(habit.id, selectedDateText, true)
+                            }
+                        }
+                    ) {
+                        HabitCard(
+                            habit = habit,
+                            completed = completed,
+                            onToggle = {
+                                scope.launch {
+                                    HabitRepository.setHabitCompleted(habit.id, selectedDateText, !completed)
+                                }
+                            },
+                            onEdit = { onEditHabit(habit.id) }
+                        )
+                    }
                 }
             }
             item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -165,6 +231,27 @@ fun HomeScreen(
                 selectedTask = null
                 onEditTask(task.id)
             }
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, meta: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = meta,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -396,13 +483,60 @@ private fun DateBubble(
 }
 
 @Composable
+private fun SwipeCompleteBox(
+    enabled: Boolean,
+    onComplete: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val threshold = 138f
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF40916C))
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (offsetX > threshold) onComplete()
+                        offsetX = 0f
+                    },
+                    onDragCancel = { offsetX = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        if (dragAmount > 0f) {
+                            offsetX = (offsetX + dragAmount).coerceIn(0f, 220f)
+                            change.consume()
+                        }
+                    }
+                )
+            }
+    ) {
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+            Spacer(modifier = Modifier.size(8.dp))
+            Text("Complete", color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+        Box(modifier = Modifier.offset { IntOffset(offsetX.roundToInt(), 0) }) {
+            content()
+        }
+    }
+}
+
+@Composable
 private fun TaskCard(task: TaskEntity, onClick: () -> Unit) {
+    val colors = taskCardPalette(task.category, task.isCompleted)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = colors.background)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -413,6 +547,8 @@ private fun TaskCard(task: TaskEntity, onClick: () -> Unit) {
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = colors.content,
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -420,7 +556,7 @@ private fun TaskCard(task: TaskEntity, onClick: () -> Unit) {
                 Text(
                     text = "${task.startTime} • ${task.durationMinutes} min • ${task.category}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = colors.subtle
                 )
                 if (task.isCollaborative) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -430,9 +566,83 @@ private fun TaskCard(task: TaskEntity, onClick: () -> Unit) {
             Icon(
                 imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Default.Edit,
                 contentDescription = if (task.isCompleted) "Completed" else "Open task",
-                tint = MaterialTheme.colorScheme.primary
+                tint = colors.accent
             )
         }
+    }
+}
+
+@Composable
+private fun HabitCard(
+    habit: HabitEntity,
+    completed: Boolean,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
+) {
+    val background = if (completed) Color(0xFFE7F4EB) else MaterialTheme.colorScheme.surface
+    val accent = if (completed) Color(0xFF40916C) else Color(0xFF7A4E9D)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = background)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onToggle) {
+                Icon(
+                    imageVector = if (completed) Icons.Default.CheckCircle else Icons.Default.Check,
+                    contentDescription = if (completed) "Habit completed" else "Mark habit complete",
+                    tint = accent
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = habit.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textDecoration = if (completed) TextDecoration.LineThrough else TextDecoration.None,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${habit.category} • target ${habit.targetPerWeek}x/week" +
+                        (habit.reminderTime?.let { " • $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit habit", tint = accent)
+            }
+        }
+    }
+}
+
+private data class CardPalette(
+    val background: Color,
+    val content: Color,
+    val subtle: Color,
+    val accent: Color
+)
+
+private fun taskCardPalette(category: String, completed: Boolean): CardPalette {
+    if (completed) {
+        return CardPalette(
+            background = Color(0xFFE7F4EB),
+            content = Color(0xFF1B4332),
+            subtle = Color(0xFF3D6B58),
+            accent = Color(0xFF40916C)
+        )
+    }
+    return when (category.lowercase(Locale.ENGLISH)) {
+        "study" -> CardPalette(Color(0xFFF1EAF9), Color(0xFF3A2453), Color(0xFF69507E), Color(0xFF7A4E9D))
+        "project" -> CardPalette(Color(0xFFE8F3ED), Color(0xFF1B4332), Color(0xFF3D6B58), Color(0xFF40916C))
+        "meeting" -> CardPalette(Color(0xFFEFE6DD), Color(0xFF3E332A), Color(0xFF74685E), Color(0xFF7A4E9D))
+        "health" -> CardPalette(Color(0xFFE0F2E6), Color(0xFF1B4332), Color(0xFF3D6B58), Color(0xFF40916C))
+        else -> CardPalette(Color(0xFFF6F2F8), Color(0xFF2F2637), Color(0xFF6A5C73), Color(0xFF7A4E9D))
     }
 }
 

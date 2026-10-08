@@ -23,8 +23,10 @@ object Routes {
     const val RATING = "rating"
     const val ABOUT = "about"
 
-    const val ADD_TASK_PATTERN = "add_task?taskId={taskId}"
+    const val ADD_TASK_PATTERN = "add_task?taskId={taskId}&habitId={habitId}"
 
     fun addTask(taskId: Long? = null): String =
-        if (taskId == null) ADD_TASK else "add_task?taskId=$taskId"
+        if (taskId == null) ADD_TASK else "add_task?taskId=$taskId&habitId=-1"
+
+    fun addHabit(habitId: Long): String = "add_task?taskId=-1&habitId=$habitId"
 }

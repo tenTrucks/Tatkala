@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.MenuBook
@@ -25,13 +27,18 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,10 +53,13 @@ import com.example.tatkala.data.repository.StreakCalculator
 import com.example.tatkala.data.repository.TaskRepository
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
+private enum class ActivityRange { WEEK, MONTH }
 private data class DailyProgress(val day: String, val value: Int)
 private data class HabitProgress(val habit: HabitEntity, val completed: Int, val streak: Int)
 private data class ActivityItem(val title: String, val date: String)
@@ -60,8 +70,23 @@ fun ProgressScreen() {
     val habits by HabitRepository.observeHabits().collectAsState(initial = emptyList())
     val logs by HabitRepository.observeCompletedLogs().collectAsState(initial = emptyList())
     val today = LocalDate.now()
+    var activityRange by remember { mutableStateOf(ActivityRange.WEEK) }
+    var activityAnchor by remember { mutableStateOf(today) }
     val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     val weekDates = (0..6).map { weekStart.plusDays(it.toLong()) }
+    val chartData = buildActivityData(
+        tasks = tasks,
+        logs = logs,
+        range = activityRange,
+        anchor = activityAnchor
+    )
+    val chartTitle = when (activityRange) {
+        ActivityRange.WEEK -> {
+            val start = activityAnchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            "${start.format(DateTimeFormatter.ofPattern("d MMM"))} - ${start.plusDays(6).format(DateTimeFormatter.ofPattern("d MMM yyyy"))}"
+        }
+        ActivityRange.MONTH -> YearMonth.from(activityAnchor).format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH))
+    }
 
     val completedTasksThisWeek = tasks.filter {
         it.isCompleted && runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates
@@ -72,13 +97,6 @@ fun ProgressScreen() {
     val weeklyGoal = (tasks.count { runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates } +
         habits.sumOf { it.targetPerWeek }).coerceAtLeast(1)
     val completedActivities = completedTasksThisWeek.size + completedLogsThisWeek.size
-    val dailyProgress = weekDates.map { date ->
-        DailyProgress(
-            day = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3),
-            value = tasks.count { it.isCompleted && it.date == date.toString() } +
-                logs.count { it.date == date.toString() && it.completed }
-        )
-    }
     val habitProgress = habits.map { habit ->
         val habitLogs = logs.filter { it.habitId == habit.id && it.completed }
         HabitProgress(
@@ -105,7 +123,29 @@ fun ProgressScreen() {
     ) {
         item { ProgressHeader() }
         item { WeeklyGoalCard(completedActivities, weeklyGoal) }
-        item { ActivityChartCard(dailyProgress) }
+        item {
+            ActivityChartCard(
+                activity = chartData,
+                range = activityRange,
+                title = chartTitle,
+                onRangeChanged = {
+                    activityRange = it
+                    activityAnchor = today
+                },
+                onPrevious = {
+                    activityAnchor = when (activityRange) {
+                        ActivityRange.WEEK -> activityAnchor.minusWeeks(1)
+                        ActivityRange.MONTH -> activityAnchor.minusMonths(1)
+                    }
+                },
+                onNext = {
+                    activityAnchor = when (activityRange) {
+                        ActivityRange.WEEK -> activityAnchor.plusWeeks(1)
+                        ActivityRange.MONTH -> activityAnchor.plusMonths(1)
+                    }
+                }
+            )
+        }
         item { HabitStreakCard(bestStreak) }
         item { HabitSummaryCard(habitProgress) }
         item { RecentActivityCard(recent) }
@@ -153,7 +193,14 @@ private fun WeeklyGoalCard(completed: Int, goal: Int) {
 }
 
 @Composable
-private fun ActivityChartCard(activity: List<DailyProgress>) {
+private fun ActivityChartCard(
+    activity: List<DailyProgress>,
+    range: ActivityRange,
+    title: String,
+    onRangeChanged: (ActivityRange) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
     ProgressCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -162,9 +209,36 @@ private fun ActivityChartCard(activity: List<DailyProgress>) {
         ) {
             Column {
                 Text("Daily Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Completed activities this week", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = if (range == ActivityRange.WEEK) "Completed activities this week" else "Completed activities this month",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             Text("${activity.sumOf { it.value }} total", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Previous range")
+            }
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = onNext) {
+                Icon(Icons.Default.ArrowForward, contentDescription = "Next range")
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActivityRange.entries.forEach {
+                FilterChip(
+                    selected = range == it,
+                    onClick = { onRangeChanged(it) },
+                    label = { Text(it.name.lowercase().replaceFirstChar { c -> c.titlecase() }) }
+                )
+            }
         }
         Spacer(modifier = Modifier.height(20.dp))
         ActivityBarChart(activity)
@@ -339,5 +413,47 @@ private fun ProgressCard(content: @Composable ColumnScope.() -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp), content = content)
+    }
+}
+
+private fun buildActivityData(
+    tasks: List<TaskEntity>,
+    logs: List<HabitLogEntity>,
+    range: ActivityRange,
+    anchor: LocalDate
+): List<DailyProgress> {
+    return when (range) {
+        ActivityRange.WEEK -> {
+            val weekStart = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            (0..6).map { offset ->
+                val date = weekStart.plusDays(offset.toLong())
+                DailyProgress(
+                    day = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3),
+                    value = tasks.count { it.isCompleted && it.date == date.toString() } +
+                        logs.count { it.date == date.toString() && it.completed }
+                )
+            }
+        }
+        ActivityRange.MONTH -> {
+            val month = YearMonth.from(anchor)
+            val first = month.atDay(1)
+            val last = month.atEndOfMonth()
+            generateSequence(first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))) {
+                it.plusWeeks(1)
+            }
+                .takeWhile { it <= last }
+                .mapIndexed { index, start ->
+                    val dates = (0..6).map { start.plusDays(it.toLong()) }
+                        .filter { YearMonth.from(it) == month }
+                    DailyProgress(
+                        day = "W${index + 1}",
+                        value = dates.sumOf { date ->
+                            tasks.count { it.isCompleted && it.date == date.toString() } +
+                                logs.count { it.date == date.toString() && it.completed }
+                        }
+                    )
+                }
+                .toList()
+        }
     }
 }

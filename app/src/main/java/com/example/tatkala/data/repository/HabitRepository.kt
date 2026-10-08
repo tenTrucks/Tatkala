@@ -31,6 +31,8 @@ object HabitRepository {
     fun observeCompletedLogsBetween(startDate: String, endDate: String): Flow<List<HabitLogEntity>> =
         dao.observeCompletedLogsBetween(startDate, endDate)
 
+    suspend fun getHabit(id: Long): HabitEntity? = dao.getHabit(id)
+
     suspend fun upsertHabit(habit: HabitEntity) {
         dao.upsertHabit(habit)
     }

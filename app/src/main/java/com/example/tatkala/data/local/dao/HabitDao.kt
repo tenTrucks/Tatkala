@@ -18,6 +18,9 @@ interface HabitDao {
     @Query("SELECT * FROM habits ORDER BY createdAt ASC")
     fun observeHabits(): Flow<List<HabitEntity>>
 
+    @Query("SELECT * FROM habits WHERE id = :id LIMIT 1")
+    suspend fun getHabit(id: Long): HabitEntity?
+
     @Query("SELECT * FROM habit_logs WHERE completed = 1")
     fun observeCompletedLogs(): Flow<List<HabitLogEntity>>
 

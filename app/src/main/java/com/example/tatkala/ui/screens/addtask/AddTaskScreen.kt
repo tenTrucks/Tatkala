@@ -48,6 +48,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.example.tatkala.data.local.entity.HabitEntity
 import com.example.tatkala.data.local.entity.TaskEntity
+import com.example.tatkala.data.notification.NotificationScheduler
 import com.example.tatkala.data.repository.HabitRepository
 import com.example.tatkala.data.repository.TaskRepository
 import kotlinx.coroutines.launch
@@ -60,6 +61,7 @@ private enum class AddMode { TASK, HABIT }
 @Composable
 fun AddTaskScreen(
     taskId: Long? = null,
+    habitId: Long? = null,
     onBack: () -> Unit,
     onSaved: () -> Unit
 ) {
@@ -67,6 +69,7 @@ fun AddTaskScreen(
     val context = LocalContext.current
     var mode by remember { mutableStateOf(AddMode.TASK) }
     var editingTask by remember { mutableStateOf<TaskEntity?>(null) }
+    var editingHabit by remember { mutableStateOf<HabitEntity?>(null) }
 
     var title by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(LocalDate.now().toString()) }
@@ -82,6 +85,8 @@ fun AddTaskScreen(
 
     var habitName by remember { mutableStateOf("") }
     var habitCategory by remember { mutableStateOf("Health") }
+    var habitCategoryExpanded by remember { mutableStateOf(false) }
+    var customHabitCategory by remember { mutableStateOf("") }
     var targetPerWeek by remember { mutableStateOf("7") }
     var reminderTime by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
@@ -105,12 +110,32 @@ fun AddTaskScreen(
         }
     }
 
+    LaunchedEffect(habitId) {
+        if (habitId != null) {
+            HabitRepository.getHabit(habitId)?.let { habit ->
+                editingHabit = habit
+                habitName = habit.name
+                habitCategory = if (habit.category in habitCategoryOptions) habit.category else "Other"
+                customHabitCategory = if (habit.category in habitCategoryOptions) "" else habit.category
+                targetPerWeek = habit.targetPerWeek.toString()
+                reminderTime = habit.reminderTime.orEmpty()
+                mode = AddMode.HABIT
+            }
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (editingTask == null) "Add" else "Edit Task")
+                    Text(
+                        when {
+                            editingTask != null -> "Edit Task"
+                            editingHabit != null -> "Edit Habit"
+                            else -> "Add"
+                        }
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -132,7 +157,7 @@ fun AddTaskScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (editingTask == null) {
+            if (editingTask == null && editingHabit == null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AddMode.entries.forEach {
                         FilterChip(
@@ -279,12 +304,33 @@ fun AddTaskScreen(
                     singleLine = true
                 )
                 OutlinedTextField(
-                    value = habitCategory,
-                    onValueChange = { habitCategory = it },
+                    value = if (habitCategory == "Other") customHabitCategory else habitCategory,
+                    onValueChange = {
+                        customHabitCategory = it
+                        habitCategory = "Other"
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Category") },
-                    singleLine = true
+                    singleLine = true,
+                    trailingIcon = {
+                        TextButton(onClick = { habitCategoryExpanded = true }) { Text("Pick") }
+                    }
                 )
+                DropdownMenu(
+                    expanded = habitCategoryExpanded,
+                    onDismissRequest = { habitCategoryExpanded = false }
+                ) {
+                    habitCategoryOptions.forEach {
+                        DropdownMenuItem(
+                            text = { Text(it) },
+                            onClick = {
+                                habitCategory = it
+                                if (it != "Other") customHabitCategory = ""
+                                habitCategoryExpanded = false
+                            }
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = targetPerWeek,
                     onValueChange = { targetPerWeek = it.filter(Char::isDigit); error = "" },
@@ -323,23 +369,23 @@ fun AddTaskScreen(
                             startTime.isBlank() -> error = "Start time is required."
                             minutes <= 0 -> error = "Duration must be more than 0."
                             else -> scope.launch {
-                                TaskRepository.upsertTask(
-                                    TaskEntity(
-                                        id = editingTask?.id ?: System.currentTimeMillis(),
-                                        title = title.trim(),
-                                        date = date,
-                                        startTime = startTime,
-                                        durationMinutes = minutes,
-                                        category = category,
-                                        description = description.trim(),
-                                        isCollaborative = isCollaborative,
-                                        collaborators = collaborators.trim(),
-                                        meetingLink = link.trim(),
-                                        location = location.trim(),
-                                        isCompleted = editingTask?.isCompleted ?: false,
-                                        createdAt = editingTask?.createdAt ?: System.currentTimeMillis()
-                                    )
+                                val task = TaskEntity(
+                                    id = editingTask?.id ?: System.currentTimeMillis(),
+                                    title = title.trim(),
+                                    date = date,
+                                    startTime = startTime,
+                                    durationMinutes = minutes,
+                                    category = category,
+                                    description = description.trim(),
+                                    isCollaborative = isCollaborative,
+                                    collaborators = collaborators.trim(),
+                                    meetingLink = link.trim(),
+                                    location = location.trim(),
+                                    isCompleted = editingTask?.isCompleted ?: false,
+                                    createdAt = editingTask?.createdAt ?: System.currentTimeMillis()
                                 )
+                                TaskRepository.upsertTask(task)
+                                NotificationScheduler.scheduleTaskReminder(context, task)
                                 onSaved()
                             }
                         }
@@ -349,14 +395,22 @@ fun AddTaskScreen(
                             habitName.isBlank() -> error = "Habit name is required."
                             target <= 0 -> error = "Target must be more than 0."
                             else -> scope.launch {
-                                HabitRepository.upsertHabit(
-                                    HabitEntity(
-                                        name = habitName.trim(),
-                                        category = habitCategory.ifBlank { "General" },
-                                        targetPerWeek = target.coerceAtMost(7),
-                                        reminderTime = reminderTime.ifBlank { null }
-                                    )
+                                val resolvedCategory = if (habitCategory == "Other") {
+                                    customHabitCategory.ifBlank { "General" }
+                                } else {
+                                    habitCategory.ifBlank { "General" }
+                                }
+                                val habit = HabitEntity(
+                                    id = editingHabit?.id ?: System.currentTimeMillis(),
+                                    name = habitName.trim(),
+                                    category = resolvedCategory,
+                                    targetPerWeek = target.coerceAtMost(7),
+                                    reminderTime = reminderTime.ifBlank { null },
+                                    isActive = editingHabit?.isActive ?: true,
+                                    createdAt = editingHabit?.createdAt ?: System.currentTimeMillis()
                                 )
+                                HabitRepository.upsertHabit(habit)
+                                NotificationScheduler.scheduleHabitReminder(context, habit)
                                 onSaved()
                             }
                         }
@@ -387,6 +441,15 @@ private fun SectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary
     )
 }
+
+private val habitCategoryOptions = listOf(
+    "Health",
+    "Focus",
+    "Study",
+    "Mindfulness",
+    "Personal",
+    "Other"
+)
 
 @Composable
 private fun PickerField(

@@ -140,7 +140,8 @@ fun TatakalaNavigation(
             composable(Routes.HOME) {
                 HomeScreen(
                     onAddClick = { navController.navigate(Routes.addTask()) },
-                    onEditTask = { taskId -> navController.navigate(Routes.addTask(taskId)) }
+                    onEditTask = { taskId -> navController.navigate(Routes.addTask(taskId)) },
+                    onEditHabit = { habitId -> navController.navigate(Routes.addHabit(habitId)) }
                 )
             }
 
@@ -152,12 +153,18 @@ fun TatakalaNavigation(
                     navArgument("taskId") {
                         type = NavType.LongType
                         defaultValue = -1L
+                    },
+                    navArgument("habitId") {
+                        type = NavType.LongType
+                        defaultValue = -1L
                     }
                 )
             ) { entry ->
                 val taskId = entry.arguments?.getLong("taskId")?.takeIf { it > 0L }
+                val habitId = entry.arguments?.getLong("habitId")?.takeIf { it > 0L }
                 AddTaskScreen(
                     taskId = taskId,
+                    habitId = habitId,
                     onBack = { navController.popBackStack() },
                     onSaved = {
                         navController.navigate(Routes.HOME) {

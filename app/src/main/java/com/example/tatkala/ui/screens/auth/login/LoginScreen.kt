@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tatkala.data.repository.UserRepository
 
 private val TatakalaPurple = Color(0xFF6D49AE)
 private val TatakalaDarkPurple = Color(0xFF4C258C)
@@ -179,8 +180,12 @@ fun LoginScreen(
                     }
 
                     else -> {
-                        errorMessage = ""
-                        onLoginSuccess()
+                        if (UserRepository.login(email.trim(), password)) {
+                            errorMessage = ""
+                            onLoginSuccess()
+                        } else {
+                            errorMessage = "Email atau password tidak cocok."
+                        }
                     }
                 }
             },

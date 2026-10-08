@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,11 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -26,85 +27,129 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.tatkala.data.local.entity.HabitEntity
+import com.example.tatkala.data.local.entity.HabitLogEntity
+import com.example.tatkala.data.local.entity.TaskEntity
+import com.example.tatkala.data.repository.HabitRepository
+import com.example.tatkala.data.repository.StreakCalculator
+import com.example.tatkala.data.repository.TaskRepository
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.TemporalAdjusters
+import java.util.Locale
 
-private val TatakalaPurple = Color(0xFF6D49AE)
-private val TatakalaDarkPurple = Color(0xFF4C258C)
-private val TatakalaLime = Color(0xFFE7FCA7)
-private val TatakalaBackground = Color(0xFFF8F8F8)
-private val TatakalaWhite = Color(0xFFFFFFFF)
-private val TatakalaMuted = Color(0xFF777777)
-private val TatakalaLightPurple = Color(0xFFF0EAF8)
-private val TatakalaLightGray = Color(0xFFE9E9E9)
-
+private enum class ActivityRange { WEEK, MONTH }
 private data class DailyProgress(val day: String, val value: Int)
-
-private data class HabitProgress(
-    val name: String,
-    val completed: Int,
-    val total: Int
-)
-
-private data class ActivityItem(
-    val title: String,
-    val time: String
-)
-
-private val weeklyActivity = listOf(
-    DailyProgress("Mon", 4),
-    DailyProgress("Tue", 6),
-    DailyProgress("Wed", 3),
-    DailyProgress("Thu", 7),
-    DailyProgress("Fri", 5),
-    DailyProgress("Sat", 2),
-    DailyProgress("Sun", 4)
-)
-
-private val habits = listOf(
-    HabitProgress("Workout", 5, 7),
-    HabitProgress("Reading", 4, 7),
-    HabitProgress("Study", 6, 7),
-    HabitProgress("Drink Water", 5, 7)
-)
-
-private val recentActivities = listOf(
-    ActivityItem("Completed Mobile Computing", "Today, 10:30 AM"),
-    ActivityItem("Completed Workout", "Today, 07:15 AM"),
-    ActivityItem("Completed Read 20 Minutes", "Yesterday, 09:20 PM")
-)
+private data class HabitProgress(val habit: HabitEntity, val completed: Int, val streak: Int)
+private data class ActivityItem(val title: String, val date: String)
 
 @Composable
 fun ProgressScreen() {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = TatakalaBackground
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { ProgressHeader() }
-            item { WeeklyGoalCard(5, 7) }
-            item { ActivityChartCard(weeklyActivity) }
-            item { HabitStreakCard() }
-            item { HabitSummaryCard(habits) }
-            item { RecentActivityCard(recentActivities) }
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+    val tasks by TaskRepository.allTasksState().collectAsState()
+    val habits by HabitRepository.observeHabits().collectAsState(initial = emptyList())
+    val logs by HabitRepository.observeCompletedLogs().collectAsState(initial = emptyList())
+    val today = LocalDate.now()
+    var activityRange by remember { mutableStateOf(ActivityRange.WEEK) }
+    var activityAnchor by remember { mutableStateOf(today) }
+    val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val weekDates = (0..6).map { weekStart.plusDays(it.toLong()) }
+    val chartData = buildActivityData(
+        tasks = tasks,
+        logs = logs,
+        range = activityRange,
+        anchor = activityAnchor
+    )
+    val chartTitle = when (activityRange) {
+        ActivityRange.WEEK -> {
+            val start = activityAnchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            "${start.format(DateTimeFormatter.ofPattern("d MMM"))} - ${start.plusDays(6).format(DateTimeFormatter.ofPattern("d MMM yyyy"))}"
         }
+        ActivityRange.MONTH -> YearMonth.from(activityAnchor).format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH))
+    }
+
+    val completedTasksThisWeek = tasks.filter {
+        it.isCompleted && runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates
+    }
+    val completedLogsThisWeek = logs.filter {
+        runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates
+    }
+    val weeklyGoal = (tasks.count { runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates } +
+        habits.sumOf { it.targetPerWeek }).coerceAtLeast(1)
+    val completedActivities = completedTasksThisWeek.size + completedLogsThisWeek.size
+    val habitProgress = habits.map { habit ->
+        val habitLogs = logs.filter { it.habitId == habit.id && it.completed }
+        HabitProgress(
+            habit = habit,
+            completed = habitLogs.count { runCatching { LocalDate.parse(it.date) }.getOrNull() in weekDates },
+            streak = StreakCalculator.currentStreak(habitLogs.mapNotNull { runCatching { LocalDate.parse(it.date) }.getOrNull() }.toSet(), today)
+        )
+    }
+    val bestStreak = habitProgress.maxByOrNull { it.streak }
+    val recent = buildList {
+        addAll(completedTasksThisWeek.map { ActivityItem("Completed task: ${it.title}", it.date) })
+        addAll(logs.sortedByDescending { it.completedAt ?: 0L }.take(8).map { log ->
+            val name = habits.firstOrNull { it.id == log.habitId }?.name ?: "Habit"
+            ActivityItem("Completed habit: $name", log.date)
+        })
+    }.sortedByDescending { it.date }.take(5)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item { ProgressHeader() }
+        item { WeeklyGoalCard(completedActivities, weeklyGoal) }
+        item {
+            ActivityChartCard(
+                activity = chartData,
+                range = activityRange,
+                title = chartTitle,
+                onRangeChanged = {
+                    activityRange = it
+                    activityAnchor = today
+                },
+                onPrevious = {
+                    activityAnchor = when (activityRange) {
+                        ActivityRange.WEEK -> activityAnchor.minusWeeks(1)
+                        ActivityRange.MONTH -> activityAnchor.minusMonths(1)
+                    }
+                },
+                onNext = {
+                    activityAnchor = when (activityRange) {
+                        ActivityRange.WEEK -> activityAnchor.plusWeeks(1)
+                        ActivityRange.MONTH -> activityAnchor.plusMonths(1)
+                    }
+                }
+            )
+        }
+        item { HabitStreakCard(bestStreak) }
+        item { HabitSummaryCard(habitProgress) }
+        item { RecentActivityCard(recent) }
+        item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
@@ -115,117 +160,98 @@ private fun ProgressHeader() {
             text = "Progress",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            color = TatakalaDarkPurple
+            color = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Track your productivity and habits",
+            text = "Actual tasks, habits, and streaks from local data",
             style = MaterialTheme.typography.bodyMedium,
-            color = TatakalaMuted
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-private fun WeeklyGoalCard(completedDays: Int, totalDays: Int) {
+private fun WeeklyGoalCard(completed: Int, goal: Int) {
     ProgressCard {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Weekly Goal",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TatakalaDarkPurple
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Keep your daily routine consistent",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TatakalaMuted
-                    )
-                }
-                Text(
-                    text = "$completedDays / $totalDays days",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TatakalaPurple
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            LinearProgressIndicator(
-                progress = { completedDays.toFloat() / totalDays },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(50)),
-                color = TatakalaPurple,
-                trackColor = TatakalaLightPurple
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "${((completedDays.toFloat() / totalDays) * 100).toInt()}% completed",
-                style = MaterialTheme.typography.labelSmall,
-                color = TatakalaMuted
-            )
-        }
+        val percent = (completed.toFloat() / goal).coerceIn(0f, 1f)
+        Text("Weekly Goal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text("$completed completed • ${(goal - completed).coerceAtLeast(0)} remaining", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(14.dp))
+        LinearProgressIndicator(
+            progress = { percent },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(50)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("${(percent * 100).toInt()}% completed", style = MaterialTheme.typography.labelMedium)
     }
 }
 
 @Composable
-private fun ActivityChartCard(activity: List<DailyProgress>) {
+private fun ActivityChartCard(
+    activity: List<DailyProgress>,
+    range: ActivityRange,
+    title: String,
+    onRangeChanged: (ActivityRange) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
     ProgressCard {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Activity",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TatakalaDarkPurple
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = "Tasks completed this week",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TatakalaMuted
-                    )
-                }
-
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Daily Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    text = "${activity.sumOf { it.value }} tasks",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = TatakalaPurple
+                    text = if (range == ActivityRange.WEEK) "Completed activities this week" else "Completed activities this month",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-            ActivityBarChart(activity)
+            Text("${activity.sumOf { it.value }} total", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Previous range")
+            }
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = onNext) {
+                Icon(Icons.Default.ArrowForward, contentDescription = "Next range")
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActivityRange.entries.forEach {
+                FilterChip(
+                    selected = range == it,
+                    onClick = { onRangeChanged(it) },
+                    label = { Text(it.name.lowercase().replaceFirstChar { c -> c.titlecase() }) }
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        ActivityBarChart(activity)
     }
 }
 
 @Composable
 private fun ActivityBarChart(activity: List<DailyProgress>) {
-    val maxValue = 7
-
+    val maxValue = activity.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(170.dp),
+            .height(160.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
@@ -235,142 +261,54 @@ private fun ActivityBarChart(activity: List<DailyProgress>) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom
             ) {
-                Text(
-                    text = item.value.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TatakalaDarkPurple
-                )
-
+                Text(item.value.toString(), style = MaterialTheme.typography.labelSmall)
                 Spacer(modifier = Modifier.height(6.dp))
-
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.62f)
-                        .height(110.dp),
+                        .height(102.dp),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .fillMaxHeight(item.value.toFloat() / maxValue)
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart = 8.dp,
-                                    topEnd = 8.dp,
-                                    bottomStart = 4.dp,
-                                    bottomEnd = 4.dp
-                                )
-                            )
-                            .background(
-                                if (item.value == maxValue) {
-                                    TatakalaDarkPurple
-                                } else {
-                                    TatakalaPurple
-                                }
-                            )
+                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 4.dp, bottomEnd = 4.dp))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
-
                 Spacer(modifier = Modifier.height(7.dp))
-
-                Text(
-                    text = item.day,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TatakalaMuted
-                )
+                Text(item.day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-private fun HabitStreakCard() {
-    val days = listOf(
-        "M" to true,
-        "T" to true,
-        "W" to true,
-        "T" to true,
-        "F" to true,
-        "S" to false,
-        "S" to true
-    )
-
+private fun HabitStreakCard(best: HabitProgress?) {
     ProgressCard {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Habit Streak",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TatakalaDarkPurple
-                    )
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Text(
-                        text = "🔥 14 Day Streak",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TatakalaDarkPurple
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(TatakalaLime),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "14",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TatakalaDarkPurple
-                    )
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Habit Streak", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = if (best == null) "No streak yet" else "${best.habit.name}: ${best.streak} day streak",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondary),
+                contentAlignment = Alignment.Center
             ) {
-                days.forEach { (day, completed) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (completed) TatakalaPurple else TatakalaLightGray
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (completed) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = TatakalaWhite
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Text(
-                            text = day,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TatakalaMuted
-                        )
-                    }
-                }
+                Text((best?.streak ?: 0).toString(), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
             }
         }
     }
@@ -379,86 +317,66 @@ private fun HabitStreakCard() {
 @Composable
 private fun HabitSummaryCard(habits: List<HabitProgress>) {
     ProgressCard {
-        Column {
-            Text(
-                text = "Habit Summary",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = TatakalaDarkPurple
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Your progress across daily habits",
-                style = MaterialTheme.typography.bodySmall,
-                color = TatakalaMuted
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
+        Text("Habit Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text("Weekly completion by habit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(16.dp))
+        if (habits.isEmpty()) {
+            Text("No habit yet. Add a habit from the Add tab.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
             habits.forEachIndexed { index, habit ->
                 HabitRow(habit)
-                if (index < habits.lastIndex) {
-                    Spacer(modifier = Modifier.height(15.dp))
-                }
+                if (index < habits.lastIndex) Spacer(modifier = Modifier.height(15.dp))
             }
         }
     }
 }
 
 @Composable
-private fun HabitRow(habit: HabitProgress) {
+private fun HabitRow(progress: HabitProgress) {
     Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(TatakalaLightPurple),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = when (habit.name) {
-                        "Workout" -> Icons.Default.FitnessCenter
-                        "Reading" -> Icons.Default.MenuBook
-                        "Study" -> Icons.Default.School
+                    imageVector = when {
+                        progress.habit.name.contains("work", ignoreCase = true) -> Icons.Default.FitnessCenter
+                        progress.habit.name.contains("read", ignoreCase = true) -> Icons.Default.MenuBook
+                        progress.habit.name.contains("study", ignoreCase = true) -> Icons.Default.School
                         else -> Icons.Default.WaterDrop
                     },
                     contentDescription = null,
-                    modifier = Modifier.size(19.dp),
-                    tint = TatakalaPurple
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
-
-            Spacer(modifier = Modifier.width(11.dp))
-
+            Spacer(modifier = Modifier.size(11.dp))
             Text(
-                text = habit.name,
+                text = progress.habit.name,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF333333)
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-
             Text(
-                text = "${habit.completed}/${habit.total}",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = TatakalaPurple
+                text = "${progress.completed}/${progress.habit.targetPerWeek}",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
         }
-
         Spacer(modifier = Modifier.height(7.dp))
-
         LinearProgressIndicator(
-            progress = { habit.completed.toFloat() / habit.total },
+            progress = { (progress.completed.toFloat() / progress.habit.targetPerWeek).coerceIn(0f, 1f) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
                 .clip(RoundedCornerShape(50)),
-            color = TatakalaPurple,
-            trackColor = TatakalaLightPurple
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
     }
 }
@@ -466,101 +384,76 @@ private fun HabitRow(habit: HabitProgress) {
 @Composable
 private fun RecentActivityCard(activities: List<ActivityItem>) {
     ProgressCard {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Recent Activity",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TatakalaDarkPurple
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = "Your latest completed tasks",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TatakalaMuted
-                    )
-                }
-
-                Icon(
-                    imageVector = Icons.Default.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = TatakalaPurple
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
+        Text("Recent Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(14.dp))
+        if (activities.isEmpty()) {
+            Text("No recent activity yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
             activities.forEachIndexed { index, activity ->
-                ActivityRow(activity)
-                if (index < activities.lastIndex) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(activity.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(activity.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
+                if (index < activities.lastIndex) Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ActivityRow(activity: ActivityItem) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(TatakalaLime),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = TatakalaDarkPurple
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = activity.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF333333),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(3.dp))
-
-            Text(
-                text = activity.time,
-                style = MaterialTheme.typography.labelSmall,
-                color = TatakalaMuted
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProgressCard(content: @Composable () -> Unit) {
+private fun ProgressCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = TatakalaWhite),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            content()
+        Column(modifier = Modifier.padding(18.dp), content = content)
+    }
+}
+
+private fun buildActivityData(
+    tasks: List<TaskEntity>,
+    logs: List<HabitLogEntity>,
+    range: ActivityRange,
+    anchor: LocalDate
+): List<DailyProgress> {
+    return when (range) {
+        ActivityRange.WEEK -> {
+            val weekStart = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            (0..6).map { offset ->
+                val date = weekStart.plusDays(offset.toLong())
+                DailyProgress(
+                    day = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3),
+                    value = tasks.count { it.isCompleted && it.date == date.toString() } +
+                        logs.count { it.date == date.toString() && it.completed }
+                )
+            }
+        }
+        ActivityRange.MONTH -> {
+            val month = YearMonth.from(anchor)
+            val first = month.atDay(1)
+            val last = month.atEndOfMonth()
+            generateSequence(first.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))) {
+                it.plusWeeks(1)
+            }
+                .takeWhile { it <= last }
+                .mapIndexed { index, start ->
+                    val dates = (0..6).map { start.plusDays(it.toLong()) }
+                        .filter { YearMonth.from(it) == month }
+                    DailyProgress(
+                        day = "W${index + 1}",
+                        value = dates.sumOf { date ->
+                            tasks.count { it.isCompleted && it.date == date.toString() } +
+                                logs.count { it.date == date.toString() && it.completed }
+                        }
+                    )
+                }
+                .toList()
         }
     }
 }

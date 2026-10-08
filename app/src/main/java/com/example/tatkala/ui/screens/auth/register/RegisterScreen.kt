@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.tatkala.data.repository.UserRepository
 
 private val TatakalaPurple = Color(0xFF6D49AE)
 private val TatakalaDarkPurple = Color(0xFF4C258C)
@@ -250,9 +251,12 @@ fun RegisterScreen(
 
                     else -> {
                         errorMessage = ""
-
-                        // Prototype:
-                        // registration dianggap berhasil tanpa backend.
+                        UserRepository.register(
+                            displayName = fullName.trim(),
+                            username = username.trim(),
+                            email = email.trim(),
+                            password = password
+                        )
                         onRegisterSuccess()
                     }
                 }

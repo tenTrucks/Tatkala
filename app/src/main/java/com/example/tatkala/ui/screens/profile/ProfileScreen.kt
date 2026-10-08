@@ -1,205 +1,174 @@
 package com.example.tatkala.ui.screens.settings.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-private val Purple = Color(0xFF6D49AE)
-private val DarkPurple = Color(0xFF4C258C)
-private val Lime = Color(0xFFE7FCA7)
-private val Background = Color(0xFFF8F8F8)
+import com.example.tatkala.data.repository.UserRepository
 
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit = {},
-    onEditProfile: () -> Unit = {}
+    onEditProfile: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
-    // Data sementara / mock
-    val userName = "Sutan"
-    val username = "@sutan"
-    val userEmail = "sutan@example.com"
-    val phoneNumber = "081234567890"
-    val status = "Aktif"
+    val profile by UserRepository.profile.collectAsState()
+    var confirmLogout by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(20.dp)
     ) {
-
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back"
-                )
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
-
             Text(
                 text = "Profile",
-                fontSize = 22.sp,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = DarkPurple
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
+        Spacer(modifier = Modifier.height(18.dp))
+
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Avatar
-            Box(
+            androidx.compose.foundation.layout.Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(108.dp)
                     .clip(CircleShape)
-                    .background(Lime),
+                    .background(MaterialTheme.colorScheme.secondary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier.size(65.dp),
-                    tint = Purple
+                    contentDescription = "Profile picture",
+                    modifier = Modifier.size(62.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
-
             Spacer(modifier = Modifier.height(14.dp))
-
-            // Nama
             Text(
-                text = userName,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkPurple
+                text = profile.displayName,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Username
             Text(
-                text = username,
-                fontSize = 14.sp,
-                color = Color.Gray
+                text = "@${profile.username.removePrefix("@")}",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
 
-            Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            // Informasi user
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp)
-                ) {
-
-                    ProfileInfoItem(
-                        title = "Email",
-                        value = userEmail
-                    )
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 14.dp),
-                        color = Color.LightGray
-                    )
-
-                    ProfileInfoItem(
-                        title = "No. Telepon",
-                        value = phoneNumber
-                    )
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 14.dp),
-                        color = Color.LightGray
-                    )
-
-                    ProfileInfoItem(
-                        title = "Status",
-                        value = status
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Tombol Edit Profile
-            Button(
-                onClick = onEditProfile,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Purple
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = "Edit Profile",
-                    fontSize = 16.sp
-                )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                ProfileInfoItem("Email", profile.email)
+                Spacer(modifier = Modifier.height(14.dp))
+                ProfileInfoItem("Phone", profile.phoneNumber.ifBlank { "-" })
+                Spacer(modifier = Modifier.height(14.dp))
+                ProfileInfoItem("Session", "Signed in locally")
             }
         }
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        Button(
+            onClick = onEditProfile,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Edit, contentDescription = null)
+            Spacer(modifier = Modifier.size(8.dp))
+            Text("Edit Profile")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = { confirmLogout = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Logout, contentDescription = null)
+            Spacer(modifier = Modifier.size(8.dp))
+            Text("Sign Out")
+        }
+    }
+
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("Sign out?") },
+            text = { Text("You will return to Login and the Home back stack will be cleared.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        UserRepository.logout()
+                        confirmLogout = false
+                        onLogout()
+                    }
+                ) { Text("Sign Out") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
 @Composable
-private fun ProfileInfoItem(
-    title: String,
-    value: String
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = title,
-            fontSize = 13.sp,
-            color = Color.Gray
-        )
-
-        Spacer(modifier = Modifier.height(5.dp))
-
-        Text(
-            text = value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            color = DarkPurple
-        )
+private fun ProfileInfoItem(title: String, value: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
     }
 }

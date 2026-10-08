@@ -1,6 +1,5 @@
 package com.example.tatkala.ui.screens.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -24,15 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tatkala.ui.screens.settings.components.SettingsRow
-
-private val TatakalaPurple = Color(0xFF6D49AE)
-private val TatakalaDarkPurple = Color(0xFF4C258C)
-private val TatakalaLime = Color(0xFFE7FCA7)
-private val TatakalaBackground = Color(0xFFF8F8F8)
 
 @Composable
 fun SettingsScreen(
@@ -49,7 +42,6 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(TatakalaBackground)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(
@@ -62,7 +54,7 @@ fun SettingsScreen(
         Text(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
-            color = TatakalaDarkPurple
+            color = MaterialTheme.colorScheme.primary
         )
 
         Spacer(modifier = Modifier.padding(4.dp))
@@ -152,7 +144,7 @@ private fun SettingsSectionTitle(
                 bottom = 4.dp
             ),
         style = MaterialTheme.typography.labelLarge,
-        color = TatakalaPurple,
+        color = MaterialTheme.colorScheme.primary,
         letterSpacing = 1.sp
     )
 }

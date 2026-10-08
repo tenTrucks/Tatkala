@@ -1,12 +1,14 @@
 package com.example.tatkala.navigation
 
 object Routes {
+    const val WELCOME = "welcome"
     const val LOGIN = "login"
     const val REGISTER = "register"
 
     const val HOME = "home"
     const val PROGRESS = "progress"
     const val ADD_TASK = "add_task"
+    const val GROUP = "group"
 
     const val SETTINGS = "settings"
     const val PROFILE = "profile"
@@ -16,4 +18,15 @@ object Routes {
     const val LANGUAGE = "language"
     const val THEME = "theme"
     const val PRIVACY = "privacy"
+    const val HELP = "help"
+    const val FAQ = "faq"
+    const val RATING = "rating"
+    const val ABOUT = "about"
+
+    const val ADD_TASK_PATTERN = "add_task?taskId={taskId}&habitId={habitId}"
+
+    fun addTask(taskId: Long? = null): String =
+        if (taskId == null) ADD_TASK else "add_task?taskId=$taskId&habitId=-1"
+
+    fun addHabit(habitId: Long): String = "add_task?taskId=-1&habitId=$habitId"
 }

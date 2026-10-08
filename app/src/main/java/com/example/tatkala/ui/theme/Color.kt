@@ -16,3 +16,10 @@ val TatakalaTextSecondary = Color(0xFF6E6E6E)
 
 val TatakalaGray = Color(0xFFEAEAEA)
 val TatakalaLightGray = Color(0xFFF3F3F3)
+
+val TatakalaDarkBackground = Color(0xFF0F0D18)
+val TatakalaDarkSurface = Color(0xFF191625)
+val TatakalaDarkElevated = Color(0xFF252036)
+val TatakalaDarkOnSurface = Color(0xFFF4F0FF)
+val TatakalaDarkMuted = Color(0xFFC5BCD8)
+val TatakalaBrightPurple = Color(0xFF9B7AE0)

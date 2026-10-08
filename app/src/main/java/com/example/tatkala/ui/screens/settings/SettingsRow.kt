@@ -16,11 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-
-private val TatakalaPurple = Color(0xFF6D49AE)
 
 @Composable
 fun SettingsRow(
@@ -35,7 +32,7 @@ fun SettingsRow(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 0.dp
@@ -54,20 +51,20 @@ fun SettingsRow(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = TatakalaPurple
+                tint = MaterialTheme.colorScheme.primary
             )
 
             Text(
                 text = title,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF252525)
+            style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFF999999)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

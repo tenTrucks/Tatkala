@@ -1,182 +1,87 @@
 package com.example.tatkala.ui.screens.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-private val Purple = Color(0xFF6D49AE)
-private val DarkPurple = Color(0xFF4C258C)
-private val Background = Color(0xFFF8F8F8)
+import com.example.tatkala.data.repository.NotificationSettings
+import com.example.tatkala.data.repository.SettingsRepository
 
 @Composable
-fun NotificationScreen(
-    onBack: () -> Unit = {}
-) {
-    var pushNotificationEnabled by remember {
-        mutableStateOf(true)
-    }
-
-    var taskReminderEnabled by remember {
-        mutableStateOf(true)
-    }
-
-    var habitReminderEnabled by remember {
-        mutableStateOf(true)
-    }
-
-    var collaborationNotificationEnabled by remember {
-        mutableStateOf(false)
-    }
-
+fun NotificationScreen(onBack: () -> Unit = {}) {
+    val settings by SettingsRepository.notifications.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .padding(20.dp)
     ) {
-
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back"
-                )
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
             }
-
-            Text(
-                text = "Notification",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkPurple
-            )
+            Text("Notification", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+        Spacer(modifier = Modifier.height(12.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                )
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-
-                    NotificationItem(
-                        title = "Push Notifications",
-                        description = "Receive notifications from Tatakala.",
-                        checked = pushNotificationEnabled,
-                        onCheckedChange = {
-                            pushNotificationEnabled = it
-                        }
-                    )
-
-                    HorizontalDivider()
-
-                    NotificationItem(
-                        title = "Task Reminder",
-                        description = "Get reminded about upcoming tasks.",
-                        checked = taskReminderEnabled,
-                        onCheckedChange = {
-                            taskReminderEnabled = it
-                        }
-                    )
-
-                    HorizontalDivider()
-
-                    NotificationItem(
-                        title = "Habit Reminder",
-                        description = "Get reminded to complete your habits.",
-                        checked = habitReminderEnabled,
-                        onCheckedChange = {
-                            habitReminderEnabled = it
-                        }
-                    )
-
-                    HorizontalDivider()
-
-                    NotificationItem(
-                        title = "Collaboration Notification",
-                        description = "Receive updates from collaborations.",
-                        checked = collaborationNotificationEnabled,
-                        onCheckedChange = {
-                            collaborationNotificationEnabled = it
-                        }
-                    )
+            Column {
+                NotificationItem("Master Notification", "Allow Tatakala reminder preferences.", settings.master) {
+                    SettingsRepository.setNotifications(settings.copy(master = it))
+                }
+                NotificationItem("Task Reminder", "Reminder preference for upcoming tasks.", settings.taskReminder) {
+                    SettingsRepository.setNotifications(settings.copy(taskReminder = it))
+                }
+                NotificationItem("Habit Reminder", "Reminder preference for habits.", settings.habitReminder) {
+                    SettingsRepository.setNotifications(settings.copy(habitReminder = it))
+                }
+                NotificationItem("Collaboration Reminder", "Reminder preference for collaborative tasks.", settings.collaborationReminder) {
+                    SettingsRepository.setNotifications(settings.copy(collaborationReminder = it))
                 }
             }
         }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            "This prototype persists reminder preferences locally. Full scheduled notifications can be enabled later without changing your data.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun NotificationItem(
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
+private fun NotificationItem(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = 18.dp,
-                vertical = 16.dp
-            ),
+            .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = DarkPurple
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = description,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Purple
-            )
-        )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
